@@ -6,19 +6,20 @@ import argparse
 import hashlib
 import logging
 import os
+import socket
 import struct
 import sys
 import threading
 import time
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Optional
 
 import requests
 from flask import Flask, Response, jsonify
 
-__version__ = "0.1.5"
+__version__ = "0.1.6"
 
 ACTIVITIES = ("all", "run", "ride", "winter", "water")
 COLORS = ("hot", "blue", "bluered", "purple", "gray")
@@ -418,6 +419,17 @@ def config_from_args(args: argparse.Namespace) -> Config:
     )
 
 
+def available_port(host: str, port: int) -> bool:
+    """Check whether the HTTP server can bind to this address."""
+    family = socket.AF_INET6 if ":" in host else socket.AF_INET
+    try:
+        with socket.socket(family, socket.SOCK_STREAM) as sock:
+            sock.bind((host, port))
+        return True
+    except OSError:
+        return False
+
+
 # WSGI-compatible application with safe non-interactive defaults.
 app = create_app()
 
@@ -430,7 +442,20 @@ def main(argv: Optional[list[str]] = None) -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     config = config_from_args(args)
+    cli_args = argv if argv is not None else sys.argv[1:]
+    explicit_port = any(arg == "--port" or arg.startswith("--port=") for arg in cli_args)
+    if config.port == 5000 and not explicit_port and "LPSH_PORT" not in os.environ:
+        if not available_port(config.host, config.port):
+            for port in range(5001, 5011):
+                if available_port(config.host, port):
+                    logger.warning("Port 5000 is in use; using port %s instead", port)
+                    config = replace(config, port=port)
+                    break
+            else:
+                raise SystemExit("Ports 5000–5010 are in use; specify an available port with --port")
     runtime_app = create_app(config)
+    display_host = "127.0.0.1" if config.host in ("0.0.0.0", "::") else config.host
+    logger.info("XYZ URL: http://%s:%s/heatmap/{z}/{x}/{y}.png", display_host, config.port)
 
     logger.info(
         "Starting local-proxy-strava-heatmap %s on %s:%s (activity=%s, color=%s, cache=%s)",

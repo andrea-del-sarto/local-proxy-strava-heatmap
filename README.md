@@ -30,6 +30,8 @@ In a terminal, an arrow-key menu lets you choose the **source**, activity and co
 
 The default binds to `127.0.0.1:5000`, uses activity `all`, color `bluered`, and enables a disk cache in `./cache`. The **direct** source fetches tiles from `http://89.168.43.214:9192/identified/globalheat` with `v=19` and remains the default. The **nakarte** source uses `https://proxy.nakarte.me/https/content-a.strava.com/identified/globalheat` without `v`, adding `Referer: https://nakarte.me/`. Both are externally hosted services whose availability and operators are outside this project. The proxy does not host Strava data itself. You can also supply a custom base URL with `--upstream`.
 
+If the default port 5000 is occupied, startup selects the first available port from 5001 through 5010 and logs the resulting XYZ URL. Use that URL in your GIS layer. An explicit `--port` or `LPSH_PORT` keeps the requested port and does not fall back; for example, `python lpsh.py --port 5001 --no-menu`.
+
 To select Nakarte directly, run `python lpsh.py --source nakarte --activity all --color hot --no-menu`. To return to the default source, run `python lpsh.py` and keep the first source selected in the menu.
 
 The direct source provides tiles through zoom **16**. Requests at zoom 17 and above returned 404 in tests on 26 September 2026. The proxy therefore rejects coordinates above zoom 16 by default for either source. Set the maximum zoom of your GIS XYZ layer to 16; the GIS can still zoom the map display, but it cannot fetch additional heatmap detail beyond the source resolution. If a source offers more detail, raise the limit with `--max-zoom`.
